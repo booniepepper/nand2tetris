@@ -39,5 +39,97 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+
+    // compute
+
+    // Decide D
+    DRegister(in=aluOut, load=writeD, out=currD);
+
+    // Decide A
+    Mux16(a[0..14]=aiConst, b=aluOut, sel=aOrCInstruction, out=nextA);
+    Register(in=nextA, load=writeA, out=currA, out[0..14]=addressM);
+
+    // Decide A or M (val/ref)
+    Mux16(a=currA, b=inM, sel=aOrM, out[0..14]=currAM);
+    
+    // Maybe write M
+
+    ALU(
+        // in
+        x=currD,
+        zx=zeroD,
+        nx=negaD,
+        
+        y[0..14]=currAM,
+        zy=zeroAM,
+        ny=negaAM,
+
+        f=plusOrAnd,
+        no=negaAluOut,
+
+        // out
+        out=outM,
+        out=aluOut,
+        zr=aluWasZero,
+        ng=aluWasNega
+    );
+
+    // control
+
+    // Decode as A instruction (const) or C instruction (command)
+    // A: 0nnn nnnn nnnn nnnn // n = binary digits
+    // C: 1xxa cccc ccdd djjj // a = a/m, c = comp, d = dest, j = jump
+
+    Or16(
+        a=instruction,
+
+        /* *** out *** */
+
+        out[15]=aOrCInstruction,
+        
+        out[0..14]=aiConst,
+
+        out[12]=aOrM,
+
+        // comp
+        out[11]=zeroD,
+        out[10]=negaD,
+        out[9]=zeroAM,
+        out[8]=negaAM,
+        out[7]=plusOrAnd,
+        out[6]=negaAluOut,
+
+        // dest
+        out[5]=ifCWriteA,
+        out[4]=ifCWriteD,
+        out[3]=ifCWriteM,
+
+        // jump
+        out[2]=shouldJL,
+        out[1]=shouldJZ,
+        out[0]=shouldJG
+    );
+ 
+    And(a=aOrCInstruction, b=ifCWriteD, out=writeD);
+    
+    Not(in=aOrCInstruction, out=aInstruction);
+    Or(a=aInstruction, b=ifCWriteA, out=writeA);
+    
+    And(a=aOrCInstruction, b=ifCWriteM, out=writeM);
+
+    // pc (program counter: line to execute)
+
+    Not(in=aluWasZero, out=aluNotZero);
+    Not(in=aluWasNega, out=aluNotNega);
+    And(a=aluNotZero, b=aluNotNega, out=aluWasPosi);
+
+    And(a=aluWasNega, b=shouldJL, out=jumpL);
+    And(a=aluWasZero, b=shouldJZ, out=jumpZ);
+    And(a=aluWasPosi, b=shouldJG, out=jumpG);
+
+    Or8Way(in[0]=jumpL, in[1]=jumpZ, in[2]=jumpG, out=maybeJump);
+    And(a=aOrCInstruction, b=maybeJump, out=shouldJump);
+    Not(in=shouldJump, out=shouldIncr);
+
+    PC(in=currA, inc=shouldIncr, load=shouldJump, reset=reset, out[0..14]=pc);
 }
