@@ -27,5 +27,30 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+
+    Not(out=hi);
+
+    // What to read or (maybe) load
+    DMux4Way(in=hi, sel=address[13..14], a=selMain1, b=selMain2, c=selScreen);
+    Or(a=selMain1, b=selMain2, out=selMain);
+    And(a=selMain, b=load, out=loadMain);
+    And(a=selScreen, b=load, out=loadScreen);
+
+    // Keyboard -- Must be: 110 0000 0000 0000
+    Or8Way(in=address[0..7], out=failKbdLo);
+    Or8Way(in[0..4]=address[8..12], out=failKbdHi);
+    Or(a=failKbdLo, b=failKbdHi, out=failKbd);
+    Not(in=failKbd, out=selKbd);
+
+    // Ok the memory:
+    RAM16K(in=in, load=loadMain, address=address[0..13], out=mainMem);
+    Screen(in=in, load=loadScreen, address=address[0..12], out=screenMem);
+    Keyboard(out=keyboardMem);
+
+    // Output select:
+    Mux16(b=mainMem, sel=selMain, out=mainOut);
+    Mux16(b=screenMem, sel=selScreen, out=screenOut);
+    Or16(a=mainOut, b=screenOut, out=mainOrScreenOut);
+    Mux16(b=keyboardMem, sel=selKbd, out=keyboardOut);
+    Or16(a=mainOrScreenOut, b=keyboardOut, out=out);
 }
