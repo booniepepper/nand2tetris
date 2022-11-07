@@ -19,5 +19,41 @@ CHIP Computer {
     IN reset;
 
     PARTS:
-    // Put your code here:
+
+    ROM32K(
+        address=pc,
+
+        out=instruction,
+        out[5]=ifCwriteA,
+        out[12]=aOrM,
+        out[15]=isCinst,
+        out[0..14]=constA
+    );
+    
+    Memory(
+        in=outM,
+        load=writeM,
+        address=addressM,
+
+        out=inM
+    );
+
+    CPU(
+        inM=inM,
+        instruction=instruction,
+        reset=reset,
+
+        outM=outM,
+        writeM=writeM,
+        addressM=outAddressM,
+        pc=pc
+    );
+
+    ARegister(in[0..14]=currAddressM, load=writeA, out[0..14]=addressM);
+    
+    Mux16(a[0..14]=outAddressM, b=outM, sel=aOrM, out=nextAifC);
+    Mux16(a[0..14]=constA, b=nextAifC, sel=isCinst, out[0..14]=currAddressM);
+
+    Not(in=isCinst, out=isAinst);
+    Or(a=isAinst, b=ifCwriteA, out=writeA);
 }
